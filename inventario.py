@@ -5,6 +5,11 @@ Para desarrollar el problema del inventario.
 import math
 from MDPs import MDP, iteracion_valor
 
+def poisson_pmf(k, lambda_):
+    if k < 0:
+        return 0.0
+    return math.exp(-lambda_)*(lambda_**k)/math.factorial(k)
+
 class Inventario(MDP):
     """
     MDP para el problema de inventario
@@ -51,17 +56,42 @@ class Inventario(MDP):
         """
         return list(range(0, self.capacidad - s + 1))
     
+    def _ganancia(self, s, a, D):
+        """
+        Ganancia neta cuando en el estado s se pide a y la demanda es D
+        """
+        I = s + a #Inventario al inicio del dia
+        sp = I -D #Inventario al final del dia
+
+        ventas = self.precio * max(0, min(D, I))
+        compra = self.costo_var * a
+        fijo = self.costo_fijo * (1 if a > 0 else 0)
+        hold = self.costo_hold * max(0, sp)
+        back = self.costo_back * max(0, -sp)
+        opp = self.margen_perd * max(0, D - max(0,1))
+
+        return ventas - compra - fijo - hold - back - opp
+    
+    def prob_transicion(self, s, a, s_):
+        D = (s+a) - s_
+
+        if s_ == self.s_min:
+            return sum(
+                poisson_pmf(d, self.lambda_)
+                for d in range(D, self.D_max + 1)
+            )
+        elif D < 0:
+            return 0.0
+        else:
+            return poisson_pmf(D, self.lambda_)
+
     def recompensa(self, s, a, s_):
         #TODO: Completar este método
         pass
         
-    def prob_transicion(self, s, a, s_):
-        #TODO: Completar este método
-        pass
-                
     def es_terminal(self, s):
-        #TODO: Completar este método
-        pass
+        #Como un negocio opera indefinidamente, siempre es falso
+        return False
 
 
 if __name__ == "__main__":
