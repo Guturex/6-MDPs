@@ -29,7 +29,7 @@ class Inventario(MDP):
         estados = list(range(-backlog_max, capacidad + 1))
         super().__init__(estados, gama)
 
-        self.lambda = lambda_
+        self.lambda_ = lambda_
         self.capacidad = capacidad
         self.backlog_max = backlog_max
         self.precio = precio
@@ -86,8 +86,23 @@ class Inventario(MDP):
             return poisson_pmf(D, self.lambda_)
 
     def recompensa(self, s, a, s_):
-        #TODO: Completar este método
-        pass
+        D = (s + a) - s
+
+        if s_ == self.s_min:
+            #Promedio ponderado de G para todos D que llevan a s_ min o menos
+            total_prob = 0.0
+            total_reward = 0.0
+            for d in range(D, self.D_max + 1):
+                p = poisson_pmf(d, self.lambda_)
+                total_prob += p
+                total_reward += p * self._ganancia(s, a, d)
+            return total_reward/total_prob if total_prob > 0 else 0.0
+        
+        elif D < 0:
+            return 0.0
+        
+        else:
+            return self._ganancia(s, a, D)
         
     def es_terminal(self, s):
         #Como un negocio opera indefinidamente, siempre es falso
