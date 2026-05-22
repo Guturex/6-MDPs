@@ -68,7 +68,7 @@ class Inventario(MDP):
         fijo = self.costo_fijo * (1 if a > 0 else 0)
         hold = self.costo_hold * max(0, sp)
         back = self.costo_back * max(0, -sp)
-        opp = self.margen_perd * max(0, D - max(0,1))
+        opp = self.margen_perd * max(0, D - max(0,I))
 
         return ventas - compra - fijo - hold - back - opp
     
@@ -86,7 +86,7 @@ class Inventario(MDP):
             return poisson_pmf(D, self.lambda_)
 
     def recompensa(self, s, a, s_):
-        D = (s + a) - s
+        D = (s + a) - s_
 
         if s_ == self.s_min:
             #Promedio ponderado de G para todos D que llevan a s_ min o menos
@@ -111,28 +111,85 @@ class Inventario(MDP):
 
 if __name__ == "__main__":
 
-    inventario = Inventario(0.9, 0.5, ...)  #TODO: Agregar lo que se requiera
+    inv = Inventario(gama=0.95, lambda_=4)
 
-    pi_star, V = iteracion_valor(inventario, ...) #TODO: Agregar lo que se requiera
+    print("Estados:", inv.estados)
+    print("D_max  :", inv.D_max)
+    print()
+
+    for s in [-10, 0, 5, 20]:
+        print(f"  acciones_legales({s:>3}) = 0..{max(inv.acciones_legales(s))}")
+
+    print()
+
+    casos = [
+        ( 0, 5,  1),
+        ( 5, 3,  4),
+        (10, 0,  6),
+        (-5, 5, -4),
+    ]
+    print(f"{'(s, a, s_)':^25} {'T(s,a,s_)':^12} {'R(s,a,s_)':^12}")
+    print("-" * 52)
+    for (s, a, s_) in casos:
+        t = inv.prob_transicion(s, a, s_)
+        r = inv.recompensa(s, a, s_)
+        print(f"  ({s:>3},{a:>3},{s_:>3})        {t:>10.4f}   {r:>10.2f}")
+
+    print("\n" + "=" * 60)
+    print("SEGUNDA PARTE: Iteracion de Valor  (λ=4, γ=0.95)")
+    print("=" * 60)
+
+    pi_star, V = iteracion_valor(inv, epsilon=1e-4)
 
     print("-" * 60)
-    print("Estado".center(20) + "Acción".center(20) + "Valor".center(20))
-    print("-" * 60 )
-    for s in pi_star:
-        print(f"{s:^20}{pi_star[s]:^20}{V[s]:^20.2f}")
+    print(f"{'Estado':^20}{'Accion (pedir)':^20}{'Valor V(s)':^20}")
     print("-" * 60)
+    for s in inv.estados:
+        accion = pi_star.get(s, "—")
+        print(f"{s:^20}{str(accion):^20}{V[s]:^20.2f}")
+    print("-" * 60)
+
+    print("\n" + "=" * 60)
+    print("COMPARACION DE POLITICA: λ=4 vs λ=8")
+    print("=" * 60)
+
+    inv8 = Inventario(gama=0.95, lambda_=8)
+    pi8, V8 = iteracion_valor(inv8, epsilon=1e-4)
+
+    print(f"{'Estado':^12} {'π*(λ=4)':^14} {'π*(λ=8)':^14} {'Diferencia':^12}")
+    print("-" * 54)
+    for s in inv.estados:
+        a4 = pi_star.get(s, 0)
+        a8 = pi8.get(s, 0)
+        diff = a8 - a4
+        signo = f"+{diff}" if diff > 0 else str(diff)
+        print(f"{s:^12} {str(a4):^14} {str(a8):^14} {signo:^12}")
+    print("-" * 54)
 
 
 """
 Contesta las preguntas aquí mismo (has espacio entre las preguntas):
 
 1. ¿Cómo se comporta las transiciones y las ganancias para casos específicos de $s$ y $a$? 
+Mientras haya mayor inventario disponible, mayor gaancia. El backlog perjudica porque acumulas penalizacion
++ el margen perdido, sin ganar nada en las ventas.
 2. ¿Qué psa si hay mucho almacen? 
+V(s) sigue creciendo, pero cada vez mas despacio. Tener mas stock es mejor que menos, pero el costo
+de almacenamiento tambien puede afectar a la ganancia. 
 3. ¿Que pasa si hay muy poco o estamos sin almacen? 
+El backlog es la peor situacion, pues no vendes nada, pag penalizacion por cada unidad faltante
+y pierdes el margen.
 4. ¿Existe un punto donde la ganancia sea máxima?  
+Sí, I = 9. 
 ---
 5. ¿Cómo se ve la política óptima? ¿Tiene sentido?
+Si el inventario es menor o igual a 5, pedir hasta llegar a 9, si no, no pedir.
+Tiene sentido, ya que el costo fijo de $40 hace que no valga la pena ordenar cantidades
+pequeñas.
 6. ¿Como se comporta la función de valor de estado V(s)?
+Para s igual o menor a 5, V sube exactamente $80 por unidad, que es exactamente el costo de compra.
+Para s mayor o igual a 6, V sigue creciendo pero con incrementos irregulares y decrecientes.
 7. ¿Cómo cambiaría la política si la variabilidad de la demanda (lambda) aumenta de 4 a 8?
-
+El nivel oprimo sube de 9 a 13 y el punto de reorden sube de 5 a 10. Necesitas mas colchon
+para evitar el backlog.
 """
